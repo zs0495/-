@@ -1,0 +1,78 @@
+from flask import Flask, render_template, request, redirect, url_for, session
+from flask_mysqldb import MySQL
+import MySQLdb.cursors
+
+
+app = Flask(__name__)
+
+app.secret_key = 'your_secret_key'
+
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'
+app.config['MYSQL_PASSWORD'] = 'your_mysql_password'  # replace with actual
+app.config['MYSQL_DB'] = 'your_database_name'
+mysql = MySQL(app)
+
+
+#signin route
+
+@app.route('/signin', methods=['GET', 'POST'])
+def signin():
+    msg = ''
+
+    if request.method == 'POST':
+        user_id = request.form['id']
+        name = request.form['name']
+        age = request.form['age']
+        address = request.form['address']
+        phone = request.form['phone']
+        password = request.form['password']
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))
+        account = cursor.fetchone()
+        if account:
+            msg = '이미 존재하는 ID입니다.'
+        else:
+            cursor.execute('INSERT INTO users VALUES (%s, %s, %s, %s, %s, %s)',
+                           (user_id, name, age, address, phone, password))
+            mysql.connection.commit()
+            msg = '계정이 성공적으로 생성되었습니다.'
+            return redirect(url_for('login'))
+    return render_template('signin.html', msg=msg)
+
+
+
+
+    #login route
+
+    @app.route('/login', methods=['GET', 'POST'])
+def login():
+    msg = ''
+    if request.method == 'POST':
+        user_id = request.form['id']
+        password = request.form['password']
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT * FROM users WHERE id = %s AND password = %s', (user_id, password))
+        account = cursor.fetchone()
+        if account:
+            session['loggedin'] = True
+            session['id'] = account['id']
+            return redirect(url_for('mypage'))
+        else:
+            msg = 'Incorrect id or password!'
+    return render_template('login.html', msg=msg)
+
+
+
+
+    #mypage route
+
+ @app.route('/mypage')
+def mypage():
+    if 'loggedin' in session and 'id' in session:
+        user_id = session['id']
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))
+        account = cursor.fetchone()
+        return render_template('mypage.html', user=account)
+    return redirect(url_for('login'))
